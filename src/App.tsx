@@ -82,6 +82,10 @@ const App = () => {
         }
       }
       
+      if (vrm) {
+        vrm.update(delta);
+      }
+      
       if (controlsRef.current) {
         controlsRef.current.update();
       }
