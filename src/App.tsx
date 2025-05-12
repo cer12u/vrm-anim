@@ -132,7 +132,7 @@ const App = () => {
             const proxy = new VRMLookAtQuaternionProxy(vrm.lookAt);
             console.log('Created VRMLookAtQuaternionProxy:', proxy);
             
-            proxy.name = 'vrmLookAtProxy';
+            proxy.name = 'VRMLookAtQuaternionProxy';
             vrm.scene.add(proxy);
             
             (window as any).vrmLookAtProxy = proxy;
@@ -174,7 +174,7 @@ const App = () => {
     console.log('Current VRM LookAt proxy from global:', (window as any).vrmLookAtProxy);
     console.log('Current VRM scene children:', vrm.scene.children);
     
-    const proxyInScene = vrm.scene.children.find(child => child.name === 'vrmLookAtProxy');
+    const proxyInScene = vrm.scene.children.find(child => child.name === 'VRMLookAtQuaternionProxy');
     console.log('Found proxy in scene:', proxyInScene);
     
     if (!vrm.lookAt) {
@@ -204,7 +204,7 @@ const App = () => {
         if (!proxyInScene && vrm.lookAt) {
           console.log('Creating new proxy before animation clip creation');
           const newProxy = new VRMLookAtQuaternionProxy(vrm.lookAt);
-          newProxy.name = 'vrmLookAtProxy';
+          newProxy.name = 'VRMLookAtQuaternionProxy';
           vrm.scene.add(newProxy);
           console.log('Added new proxy to scene:', newProxy);
         }
