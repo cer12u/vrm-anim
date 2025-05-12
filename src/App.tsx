@@ -128,9 +128,19 @@ const App = () => {
           setVrm(vrm);
           
           if (vrm.lookAt) {
+            console.log('VRM LookAt component found:', vrm.lookAt);
             const proxy = new VRMLookAtQuaternionProxy(vrm.lookAt);
+            console.log('Created VRMLookAtQuaternionProxy:', proxy);
+            
+            proxy.name = 'vrmLookAtProxy';
             vrm.scene.add(proxy);
+            
+            (window as any).vrmLookAtProxy = proxy;
+            
+            console.log('Added proxy to scene:', vrm.scene);
             setLookAtProxy(proxy);
+          } else {
+            console.warn('VRM model does not have a lookAt component');
           }
           
           setMessage(`${file.name} を読み込みました`);
@@ -161,6 +171,18 @@ const App = () => {
     
     setMessage(`アニメーションファイル ${file.name} を読み込み中...`);
     
+    console.log('Current VRM LookAt proxy from global:', (window as any).vrmLookAtProxy);
+    console.log('Current VRM scene children:', vrm.scene.children);
+    
+    const proxyInScene = vrm.scene.children.find(child => child.name === 'vrmLookAtProxy');
+    console.log('Found proxy in scene:', proxyInScene);
+    
+    if (!vrm.lookAt) {
+      console.warn('VRM model does not have a lookAt component, creating one might fail');
+    } else {
+      console.log('VRM LookAt component exists:', vrm.lookAt);
+    }
+    
     const loader = new GLTFLoader();
     
     loader.load(
@@ -171,6 +193,7 @@ const App = () => {
           return;
         }
         
+        console.log('Creating VRMAnimation');
         const vrmAnimation = new VRMAnimation();
         vrmAnimation.humanoidTracks = {
           translation: new Map(),
@@ -178,15 +201,27 @@ const App = () => {
         };
         setAnimation(vrmAnimation);
         
+        if (!proxyInScene && vrm.lookAt) {
+          console.log('Creating new proxy before animation clip creation');
+          const newProxy = new VRMLookAtQuaternionProxy(vrm.lookAt);
+          newProxy.name = 'vrmLookAtProxy';
+          vrm.scene.add(newProxy);
+          console.log('Added new proxy to scene:', newProxy);
+        }
+        
+        console.log('Creating VRM animation clip with VRM:', vrm);
         const clip = createVRMAnimationClip(vrmAnimation, vrm);
+        console.log('Created animation clip:', clip);
         
         if (clip) {
+          console.log('Creating animation action with mixer');
           const action = mixerRef.current.clipAction(clip);
           action.reset();
           action.play();
           setIsPlaying(true);
           setMessage(`アニメーション ${file.name} を再生中`);
         } else {
+          console.error('Failed to create animation clip');
           setMessage('アニメーションの適用に失敗しました');
         }
       },
