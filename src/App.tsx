@@ -24,6 +24,7 @@ const App = () => {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
+  const animationActionRef = useRef<THREE.AnimationAction | null>(null);
   const clockRef = useRef<THREE.Clock>(new THREE.Clock());
   
   useEffect(() => {
@@ -72,6 +73,13 @@ const App = () => {
       
       if (mixerRef.current) {
         mixerRef.current.update(delta);
+        
+        if (Math.floor(clockRef.current.elapsedTime) % 2 === 0 && animationActionRef.current) {
+          const action = animationActionRef.current;
+          if (action && action.isRunning()) {
+            console.debug('Animation running, time:', clockRef.current.elapsedTime.toFixed(2));
+          }
+        }
       }
       
       if (controlsRef.current) {
@@ -288,11 +296,34 @@ const App = () => {
         
         if (clip && clip.tracks.length > 0) {
           console.log('Creating animation action with mixer');
+          if (animationActionRef.current) {
+            console.log('Stopping previous animation action');
+            animationActionRef.current.stop();
+          }
+          
           const action = mixerRef.current.clipAction(clip);
+          console.log('Animation action created:', action);
+          
+          animationActionRef.current = action;
+          
+          action.clampWhenFinished = false;
+          action.loop = THREE.LoopRepeat;
+          action.timeScale = 1.0;
+          action.weight = 1.0;
+          
           action.reset();
           action.play();
+          
           setIsPlaying(true);
           setMessage(`アニメーション ${file.name} を再生中`);
+          
+          console.log('Animation action state:', {
+            enabled: action.enabled,
+            paused: action.paused,
+            isRunning: action.isRunning(),
+            weight: action.getEffectiveWeight(),
+            timeScale: action.getEffectiveTimeScale()
+          });
         } else {
           console.error('Failed to create animation clip or clip has no tracks');
           setMessage('アニメーションの適用に失敗しました');
@@ -312,20 +343,32 @@ const App = () => {
   };
   
   const toggleAnimation = () => {
-    if (!mixerRef.current || !animation || !vrm) return;
+    if (!animationActionRef.current) {
+      console.warn('No animation action available to toggle');
+      return;
+    }
     
-    const clip = createVRMAnimationClip(animation, vrm);
-    const actions = mixerRef.current.clipAction(clip);
+    console.log('Toggling animation, current state:', isPlaying);
     
     if (isPlaying) {
-      actions.paused = true;
+      console.log('Pausing animation');
+      animationActionRef.current.paused = true;
       setIsPlaying(false);
       setMessage('アニメーションを一時停止しました');
     } else {
-      actions.paused = false;
+      console.log('Resuming animation');
+      animationActionRef.current.paused = false;
       setIsPlaying(true);
       setMessage('アニメーションを再生中');
     }
+    
+    console.log('Animation action state after toggle:', {
+      enabled: animationActionRef.current.enabled,
+      paused: animationActionRef.current.paused,
+      isRunning: animationActionRef.current.isRunning(),
+      weight: animationActionRef.current.getEffectiveWeight(),
+      timeScale: animationActionRef.current.getEffectiveTimeScale()
+    });
   };
   
   return (
