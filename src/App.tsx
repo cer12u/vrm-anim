@@ -3,7 +3,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { VRM, VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
-import { VRMAnimation, VRMLookAtQuaternionProxy, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
+import { VRMHumanBoneName } from '@pixiv/three-vrm-core';
+import { 
+  VRMAnimation, 
+  VRMLookAtQuaternionProxy, 
+  createVRMAnimationClip, 
+  VRMAnimationLoaderPlugin
+} from '@pixiv/three-vrm-animation';
 
 const App = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -183,37 +189,104 @@ const App = () => {
       console.log('VRM LookAt component exists:', vrm.lookAt);
     }
     
+    if (!proxyInScene && vrm.lookAt) {
+      console.log('Creating new proxy before animation loading');
+      const newProxy = new VRMLookAtQuaternionProxy(vrm.lookAt);
+      newProxy.name = 'VRMLookAtQuaternionProxy';
+      vrm.scene.add(newProxy);
+      console.log('Added new proxy to scene:', newProxy);
+    }
+    
     const loader = new GLTFLoader();
+    loader.register((parser) => new VRMAnimationLoaderPlugin(parser));
     
     loader.load(
       fileURL,
-      (_gltf) => {
+      (gltf) => {
         if (!vrm || !mixerRef.current) {
           setMessage('先にVRMモデルを読み込んでください');
           return;
         }
         
-        console.log('Creating VRMAnimation');
-        const vrmAnimation = new VRMAnimation();
-        vrmAnimation.humanoidTracks = {
-          translation: new Map(),
-          rotation: new Map()
-        };
-        setAnimation(vrmAnimation);
+        console.log('GLTF userData:', gltf.userData);
         
-        if (!proxyInScene && vrm.lookAt) {
-          console.log('Creating new proxy before animation clip creation');
-          const newProxy = new VRMLookAtQuaternionProxy(vrm.lookAt);
-          newProxy.name = 'VRMLookAtQuaternionProxy';
-          vrm.scene.add(newProxy);
-          console.log('Added new proxy to scene:', newProxy);
+        let vrmAnimation: VRMAnimation;
+        
+        if (gltf.userData.vrmAnimations && gltf.userData.vrmAnimations.length > 0) {
+          console.log('Found VRM animations in GLTF:', gltf.userData.vrmAnimations);
+          vrmAnimation = gltf.userData.vrmAnimations[0];
+          console.log('Using parsed VRMAnimation:', vrmAnimation);
+        } else {
+          console.log('No VRM animations found in GLTF, using standard animations');
+          vrmAnimation = new VRMAnimation();
+          
+          if (gltf.animations && gltf.animations.length > 0) {
+            console.log('Found standard animations:', gltf.animations);
+            const animation = gltf.animations[0];
+            
+            animation.tracks.forEach(track => {
+              const trackName = track.name;
+              console.log('Processing track:', trackName);
+              
+              const parts = trackName.split('.');
+              if (parts.length >= 2) {
+                const boneName = parts[0];
+                const property = parts[1];
+                
+                if ((property.includes('position') || property.includes('translation')) && boneName === 'hips') {
+                  console.log('Adding translation track for hips');
+                  vrmAnimation.humanoidTracks.translation.set('hips', track);
+                } else if (property.includes('quaternion') || property.includes('rotation')) {
+                  console.log('Checking rotation track for bone:', boneName);
+                  const isValidBoneName = [
+                    'hips', 'spine', 'chest', 'upperChest', 'neck', 'head',
+                    'leftShoulder', 'leftUpperArm', 'leftLowerArm', 'leftHand',
+                    'rightShoulder', 'rightUpperArm', 'rightLowerArm', 'rightHand',
+                    'leftUpperLeg', 'leftLowerLeg', 'leftFoot', 'rightUpperLeg',
+                    'rightLowerLeg', 'rightFoot', 'leftToes', 'rightToes', 'leftEye',
+                    'rightEye', 'jaw', 'leftThumbMetacarpal', 'leftThumbProximal',
+                    'leftThumbDistal', 'leftIndexProximal', 'leftIndexIntermediate',
+                    'leftIndexDistal', 'leftMiddleProximal', 'leftMiddleIntermediate',
+                    'leftMiddleDistal', 'leftRingProximal', 'leftRingIntermediate',
+                    'leftRingDistal', 'leftLittleProximal', 'leftLittleIntermediate',
+                    'leftLittleDistal', 'rightThumbMetacarpal', 'rightThumbProximal',
+                    'rightThumbDistal', 'rightIndexProximal', 'rightIndexIntermediate',
+                    'rightIndexDistal', 'rightMiddleProximal', 'rightMiddleIntermediate',
+                    'rightMiddleDistal', 'rightRingProximal', 'rightRingIntermediate',
+                    'rightRingDistal', 'rightLittleProximal', 'rightLittleIntermediate',
+                    'rightLittleDistal'
+                  ].includes(boneName);
+                  
+                  if (isValidBoneName) {
+                    const vrmBoneName = boneName as VRMHumanBoneName;
+                    vrmAnimation.humanoidTracks.rotation.set(vrmBoneName, track);
+                    console.log('Added rotation track for bone:', vrmBoneName);
+                  } else {
+                    console.warn(`Bone name "${boneName}" is not a valid VRMHumanBoneName, skipping track`);
+                  }
+                }
+              }
+            });
+            
+            vrmAnimation.duration = animation.duration;
+          } else {
+            console.warn('No animations found in the file');
+          }
         }
         
+        setAnimation(vrmAnimation);
+        
         console.log('Creating VRM animation clip with VRM:', vrm);
+        console.log('VRMAnimation humanoid tracks:', {
+          translation: Array.from(vrmAnimation.humanoidTracks.translation.entries()),
+          rotation: Array.from(vrmAnimation.humanoidTracks.rotation.entries())
+        });
+        
         const clip = createVRMAnimationClip(vrmAnimation, vrm);
         console.log('Created animation clip:', clip);
+        console.log('Animation clip tracks:', clip.tracks);
         
-        if (clip) {
+        if (clip && clip.tracks.length > 0) {
           console.log('Creating animation action with mixer');
           const action = mixerRef.current.clipAction(clip);
           action.reset();
@@ -221,7 +294,7 @@ const App = () => {
           setIsPlaying(true);
           setMessage(`アニメーション ${file.name} を再生中`);
         } else {
-          console.error('Failed to create animation clip');
+          console.error('Failed to create animation clip or clip has no tracks');
           setMessage('アニメーションの適用に失敗しました');
         }
       },
