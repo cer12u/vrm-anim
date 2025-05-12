@@ -3,12 +3,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { VRM, VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
-import { VRMAnimation, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
+import { VRMAnimation, VRMLookAtQuaternionProxy, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
 
 const App = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [vrm, setVrm] = useState<VRM | null>(null);
   const [animation, setAnimation] = useState<VRMAnimation | null>(null);
+  const [_lookAtProxy, setLookAtProxy] = useState<VRMLookAtQuaternionProxy | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [message, setMessage] = useState<string>('VRMファイルをアップロードしてください');
   
@@ -125,6 +126,13 @@ const App = () => {
         if (sceneRef.current) {
           sceneRef.current.add(vrm.scene);
           setVrm(vrm);
+          
+          if (vrm.lookAt) {
+            const proxy = new VRMLookAtQuaternionProxy(vrm.lookAt);
+            vrm.scene.add(proxy);
+            setLookAtProxy(proxy);
+          }
+          
           setMessage(`${file.name} を読み込みました`);
           
           const mixer = new THREE.AnimationMixer(vrm.scene);
