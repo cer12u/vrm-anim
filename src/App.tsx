@@ -26,6 +26,7 @@ const App = () => {
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
   const animationActionRef = useRef<THREE.AnimationAction | null>(null);
   const clockRef = useRef<THREE.Clock>(new THREE.Clock());
+  const lastDebugTimeRef = useRef<number>(-1);
   
   useEffect(() => {
     if (!containerRef.current) return;
@@ -87,6 +88,23 @@ const App = () => {
         
         if (vrm.humanoid) {
           vrm.humanoid.update();
+          
+          if (Math.floor(clockRef.current.elapsedTime) % 5 === 0 && 
+              Math.floor(clockRef.current.elapsedTime) !== lastDebugTimeRef.current) {
+            lastDebugTimeRef.current = Math.floor(clockRef.current.elapsedTime);
+            
+            const bones = ['leftUpperArm', 'rightUpperArm', 'leftUpperLeg', 'rightUpperLeg'];
+            bones.forEach(boneName => {
+              const bone = vrm.humanoid?.getBoneNode(boneName as VRMHumanBoneName);
+              if (bone) {
+                console.log(`Bone ${boneName} position:`, 
+                  bone.position.toArray().map(v => typeof v === 'number' ? v.toFixed(3) : v).join(', '),
+                  `rotation:`, 
+                  bone.rotation.toArray().map(v => typeof v === 'number' ? v.toFixed(3) : String(v)).join(', ')
+                );
+              }
+            });
+          }
         }
       }
       
