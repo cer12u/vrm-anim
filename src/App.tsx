@@ -163,6 +163,13 @@ const App = () => {
         
         VRMUtils.rotateVRM0(vrm);
         
+        VRMUtils.removeUnnecessaryVertices(vrm.scene);
+        VRMUtils.removeUnnecessaryJoints(vrm.scene);
+        
+        vrm.scene.traverse((obj) => {
+          obj.frustumCulled = false;
+        });
+        
         if (sceneRef.current) {
           sceneRef.current.add(vrm.scene);
           setVrm(vrm);
@@ -234,6 +241,9 @@ const App = () => {
     const loader = new GLTFLoader();
     loader.register((parser) => new VRMAnimationLoaderPlugin(parser));
     
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    console.log('Loading animation file with extension:', fileExtension);
+    
     loader.load(
       fileURL,
       (gltf) => {
@@ -246,7 +256,7 @@ const App = () => {
         
         let vrmAnimation: VRMAnimation;
         
-        if (gltf.userData.vrmAnimations && gltf.userData.vrmAnimations.length > 0) {
+        if (fileExtension === 'vrma' || (gltf.userData.vrmAnimations && gltf.userData.vrmAnimations.length > 0)) {
           console.log('Found VRM animations in GLTF:', gltf.userData.vrmAnimations);
           vrmAnimation = gltf.userData.vrmAnimations[0];
           console.log('Using parsed VRMAnimation:', vrmAnimation);
@@ -413,7 +423,7 @@ const App = () => {
           アニメーションファイルを選択
           <input 
             type="file" 
-            accept=".fbx,.glb,.gltf" 
+            accept=".vrma,.fbx,.glb,.gltf" 
             onChange={handleAnimationUpload} 
             disabled={!vrm}
           />
